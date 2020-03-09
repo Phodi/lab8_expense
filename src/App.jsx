@@ -1,7 +1,7 @@
 import React, { Component } from 'react';
 import {v4} from 'uuid';
-import axios from 'axios';
 import { BrowserRouter as Router, Route } from 'react-router-dom';
+import firebase from "./firebase/firebase";
 
 import Header from './components/Header';
 import AddTransaction from './components/AddTransaction';
@@ -17,51 +17,23 @@ export default class App extends Component {
     transactions: []
   }
 
-  loadData = () => {
-    // get data from variable
-    const data = [ 
-      {
-        id: v4(),
-        name: 'Dinner with family',
-        amount: -1250,
-        date: new Date(2020,1,28)
-      },
-      {
-        id: v4(),
-        name: 'Movie',
-        amount: -200,
-        date: new Date(2020,1,29)
-      },
-      {
-        id: v4(),
-        name: 'Lottery',
-        amount: 1500,
-        date: new Date(2020,2,2)
-      },
-      {
-        id: v4(),
-        name: 'Salary',
-        amount: 6500,
-        date: new Date(2020,1,25)
-      }
-    ];
-
-    this.setState( { transactions: data } );
-  }
-
-  loadJsonData = () => {
-    // get data from json file: "public/static/data.json"
-    axios.get('/static/data.json')
-      .then( res => {
-        const data = res.data;
-        this.setState( { transactions: data } );
-      });
+  loadFirebase = () => {
+    firebase
+    .firestore()
+    .collection("expenses")
+    .onSnapshot(transactions => {
+      const transactionList = []
+      transactions.forEach( transaction => {
+        const data = transaction.data()
+        data.date = data.date.toDate()
+        transactionList.push(data)
+      } )
+      this.setState({transactions : transactionList})
+    })
   }
 
   componentDidMount() {
-    // this.loadData();   // load data from variable
-    this.loadJsonData();  // load data from JSON file on server
-    // this.loadFirebase(); // load data from Firebase
+    this.loadFirebase(); // load data from Firebase
   }
 
   validateForm = (name,amount) => {
@@ -92,14 +64,26 @@ export default class App extends Component {
       date: new Date()
     }
 
-    this.state.transactions.unshift(newTransaction);
-    this.setState( { transactions: this.state.transactions } );
+    firebase
+    .firestore()
+    .collection("expenses")
+    .add(newTransaction)
   }
 
   clearTransactions = () => {
     let ans = window.confirm("You are going to clear all transaction history!!!")
     if (ans) {
-      this.setState( { transactions: [] } );
+      firebase
+      .firestore()
+      .collection("expenses")
+      .get()
+      .then(snapshot => {
+        snapshot.forEach(doc => {
+          firebase.firestore().collection("expenses")
+            .doc(doc.id)
+            .delete()
+        });
+      });
     }
   }
 
